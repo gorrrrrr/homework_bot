@@ -4,7 +4,7 @@ class MissingCostantException(Exception):
     pass
 
 
-class ExpectedDictException(Exception):
-    """API answer must be dict type."""
+class NotExpectedHwStatusException(Exception):
+    """API answer contains unknown Hw status."""
 
     pass

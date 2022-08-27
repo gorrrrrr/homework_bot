@@ -2,8 +2,9 @@ import logging
 import time
 from telegram import Bot
 import requests
-import settings
-from exceptions import MissingCostantException, ExpectedDictException
+from settings import (PRACTICUM_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_TOKEN,
+                      RETRY_TIME, ENDPOINT, HEADERS, HOMEWORK_STATUSES)
+import exceptions
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -12,7 +13,7 @@ logging.basicConfig(level=logging.DEBUG)
 def send_message(bot, message):
     """Отправляет сообщение в Telegram чат, определяемый TELEGRAM_CHAT_ID."""
     try:
-        bot.send_message(settings.TELEGRAM_CHAT_ID, message)
+        bot.send_message(TELEGRAM_CHAT_ID, message)
         logging.info(f'Отправлено сообщение: {message}')
     except Exception as error:
         logging.error(f'Ошибка при отправке сообщения: {error}')
@@ -20,14 +21,13 @@ def send_message(bot, message):
 
 def get_api_answer(current_timestamp):
     """Запрашивает эндпоинт API. При успехе возвращает ответ API type dict."""
-    timestamp = current_timestamp - settings.RETRY_TIME
+    timestamp = current_timestamp
     params = {'from_date': timestamp}
-    try:
-        return requests.get(settings.ENDPOINT,
-                            headers=settings.HEADERS,
-                            params=params).json()
-    except Exception as error:
-        logging.error(f'Ошибка при запросе к API: {error}')
+    response = requests.get(ENDPOINT, headers=HEADERS, params=params)
+    if response.status_code != 200:
+        logging.error('Endpoint Error.')
+        raise Exception
+    return response.json()
 
 
 def check_response(response):
@@ -35,9 +35,13 @@ def check_response(response):
     if type(response) is not dict:
         msg = 'Ответ API не является словарём!'
         logging.error(msg)
-        raise ExpectedDictException(msg)
-
-    return response['homeworks']
+        raise TypeError(msg)
+    hw = response['homeworks']
+    if type(hw) is not list:
+        msg = 'homeworks не является списком!'
+        logging.error(msg)
+        raise TypeError(msg)
+    return hw
 
 
 def parse_status(homework):
@@ -46,8 +50,12 @@ def parse_status(homework):
         logging.error('В ответе API не хватает требуемых ключей')
     homework_name = homework['homework_name']
     homework_status = homework['status']
+    if homework_status not in HOMEWORK_STATUSES.keys():
+        msg = 'В ответе API неизвестный статус ДЗ!'
+        logging.error(msg)
+        raise exceptions.NotExpectedHwStatusException(msg)
     try:
-        verdict = settings.HOMEWORK_STATUSES[homework_status]
+        verdict = HOMEWORK_STATUSES[homework_status]
         return f'Изменился статус проверки работы "{homework_name}". {verdict}'
     except Exception as error:
         logging.error(f'Ошибка присвоения статуса ДЗ: {error}')
@@ -56,14 +64,14 @@ def parse_status(homework):
 
 def check_tokens():
     """Проверяет доступность необходимых переменных окружения."""
-    return bool(settings.PRACTICUM_TOKEN
-                and settings.TELEGRAM_TOKEN
-                and settings.TELEGRAM_CHAT_ID)
+    return bool(PRACTICUM_TOKEN
+                and TELEGRAM_TOKEN
+                and TELEGRAM_CHAT_ID)
 
 
 def main():
     """Основная логика работы бота."""
-    bot = Bot(token=settings.TELEGRAM_TOKEN)
+    bot = Bot(token=TELEGRAM_TOKEN)
 
     if check_tokens() is False:
         msg = 'Не хватает необходимых констант!'
@@ -71,27 +79,27 @@ def main():
             send_message(bot, msg)
         except Exception as error:
             logging.critical(f'Не выходит сообщить об ошибке в тг: {error}')
-        raise MissingCostantException(msg)
+        raise exceptions.MissingCostantException(msg)
+    current_timestamp = int(time.time())
 
     while True:
         try:
-            current_timestamp = int(time.time())
             response = get_api_answer(current_timestamp)
             homeworks = check_response(response)
             if not homeworks:
                 logging.debug('Нет новых вердиктов по запросу.')
-                time.sleep(settings.RETRY_TIME)
+                time.sleep(RETRY_TIME)
             else:
                 for hw in homeworks:
                     msg = parse_status(hw)
                     send_message(bot, msg)
 
-            time.sleep(settings.RETRY_TIME)
+            time.sleep(RETRY_TIME)
 
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logging.error(message)
-            time.sleep(settings.RETRY_TIME)
+            time.sleep(RETRY_TIME)
 
 
 if __name__ == '__main__':
