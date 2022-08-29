@@ -89,6 +89,7 @@ def main():
         sys.exit(msg)
 
     bot = Bot(token=TELEGRAM_TOKEN)
+
     current_timestamp = int(time.time())
     prev_report = ''
     """Показалось проще в переменную prev_report передавать str"""
@@ -104,17 +105,8 @@ def main():
                     prev_report = msg
                     send_message(bot, msg)
 
-        except TimeoutError as error:
-            logging.error(error)
-        except e.NotOkResponse as error:
-            logging.error(error)
-        except TypeError as error:
-            logging.error(error)
-        except TypeError as error:
-            logging.error(error)
-        except KeyError as error:
-            logging.error(error)
-        except e.NotExpectedHwStatusException as error:
+        except (TimeoutError, e.NotOkResponse, TypeError, TelegramError,
+                KeyError, e.NotExpectedHwStatusException) as error:
             logging.error(error)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
