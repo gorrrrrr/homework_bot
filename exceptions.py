@@ -1,21 +1,22 @@
-class MissingCostantException(Exception):
+class NotForSendingError(Exception):
+    """Error class for errors that we won't send to TG."""
+
+    pass
+
+
+class MissingCostantError(NotForSendingError):
     """Any of the vital constants not found."""
 
     pass
 
 
-class NotExpectedHwStatusException(Exception):
+class NotExpectedHwStatusError(Exception):
     """API answer contains unknown Hw status."""
 
     pass
 
 
-class NotOkResponseExeption(Exception):
+class NotOkResponseError(Exception):
     """Request got not OK Status."""
 
     pass
-
-
-""" Не понял мысль: Для первых двух удобно завести общий базовый
-класс и делать его перехват в main().
-"""
